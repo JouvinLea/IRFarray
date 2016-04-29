@@ -6,6 +6,7 @@ import math
 import matplotlib.gridspec as gridspec
 import FrenchMcBands
 import PSFfit
+import os
 from scipy.special import erf
 from astropy.stats import poisson_conf_interval
 from scipy import stats
@@ -19,17 +20,16 @@ Example of commande line to run to create this 4D table with the directory of th
 ./PSFtable_script.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/PSF/' 'elm_south_stereo' 180
 ./PSFtable_script.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/PSF/Brunoconfig/output_4Dnumpyarrays' 'std_north_1b' 0
 
-./PSFtable_script.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'elm_south_stereo_Prod15_5' 180
-./PSFtable_script.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'elm_north_stereo_Prod15_5' 0
+./PSFtable_script.py 'elm_south_stereo_Prod15_5' 180
+./PSFtable_script.py 'elm_north_stereo_Prod15_5' 0
 """
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Store the PSFs from Mc simulation in a 4D numpy table')
-    parser.add_argument('directory', action="store", help='directory of the fits file of the MC simulation that we will use for fitting the PSF')
     parser.add_argument('config', action="store", help='Config')
     parser.add_argument('az_angle', action="store", help='azimuth Angle')
     results = parser.parse_args()
-    print "Store the PSF in a 4D table from the MC simulations in ", results.directory , " and for the config ", results.config, "matching with a zenith angle", results.az_angle
+    print "Store the PSF in a 4D table from the MC simulations in ", os.path.expandvars('$HESSCONFIG') , " and for the config ", results.config, "matching with a zenith angle", results.az_angle
 
     """
     Fonction defenition
@@ -171,8 +171,9 @@ if __name__ == '__main__':
 
 
     MCband=FrenchMcBands.FrenchMcBands()
+    directory=os.path.expandvars('$HESSCONFIG')
     config=results.config
-    directory=results.directory+config
+    directory=directory+"/"+config
     file_nosimu = open(directory+"/file_nosimu.txt", "w")
     file_toofewevents = open(directory+"/file_toofewevents.txt", "w")
     file_khi2toohigh = open(directory+"/file_khi2sup2.txt", "w")
@@ -241,8 +242,6 @@ if __name__ == '__main__':
                         TableSigma3[ien, ioff, izen, ieff] = s3
                         TableA2[ien, ioff, izen, ieff] = A2
                         TableA3[ien, ioff, izen, ieff] = A3
-                        outdir="/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/output_4Dnumpyarrays"
-                        np.savez(outdir+"/PSF_triplegauss_"+config+".npz", TableSigma1=TableSigma1, TableSigma2=TableSigma2, TableSigma3=TableSigma3, TableA2=TableA2, TableA3=TableA3)
                         #If the energy bin are in log, we have to take sqrt(Emin*Emax) for the center of the bin
                         #theta2bin = np.sqrt(bin_edges[:-1] * bin_edges[1:])
                         theta2bin = (bin_edges[:-1] + bin_edges[1:])/2.
@@ -265,6 +264,7 @@ if __name__ == '__main__':
                         #R68fit=R68(s1,s2,s3,A2,A3, theta2max)
                         #R68data=R68_hist(theta2f)
 
-
+    outdir=os.path.expandvars('$HESSCONFIG')+"/"+config
+    np.savez(outdir+"/PSF_triplegauss_"+config+".npz", TableSigma1=TableSigma1, TableSigma2=TableSigma2, TableSigma3=TableSigma3, TableA2=TableA2, TableA3=TableA3)
     file_toofewevents.close()
     file_nosimu.close()
