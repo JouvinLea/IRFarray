@@ -31,7 +31,7 @@ class PSFfit(object):
 
         return res
 
-    def minimization(self, model_func, s1_init=0.02, s2_init=0.05,s3_init=0.08, A2_init=0.3,A3_init=0.1):
+    def minimization(self, model_func, s1_init=0.02, s2_init=0.05,s3_init=0.08, A2_init=0.3,A3_init=0.1,use_error=False):
         if(model_func=="triplegauss"):
             m=iminuit.Minuit(self.nllp_triplegauss, s1=s1_init, s2=s2_init,s3=s3_init, A2=A2_init,A3=A3_init,
                                     limit_A2 = (1e-10,10.),limit_A3 = (1e-10,10.),
@@ -45,7 +45,28 @@ class PSFfit(object):
             s1 = np.min([s1_m,s2_m,s3_m])
             s2 = np.median([s1_m,s2_m,s3_m])
             s3 = np.max([s1_m,s2_m,s3_m])
-            return (s1, s2 , s3, m.values['A2'], m.values['A3'])        
+            if use_error:
+                if s1==s1_m:
+                    err_s1=m.errors['s1']
+                elif s1==s2_m:
+                    err_s1=m.errors['s2']
+                else:
+                    err_s1=m.errors['s3']
+                if s2==s2_m:
+                    err_s2=m.errors['s2']
+                elif s2==s1_m:
+                    err_s2=m.errors['s1']
+                else:
+                    err_s2=m.errors['s3']
+                if s3==s3_m:
+                    err_s3=m.errors['s3']
+                elif s3==s2_m:
+                    err_s3=m.errors['s2']
+                else:
+                    err_s3=m.errors['s1']
+                return (s1,err_s1, s2,err_s2 , s3,err_s3, m.values['A2'], m.errors['A2'], m.values['A3'],m.errors['A2'])
+            else:
+                return (s1, s2 , s3, m.values['A2'], m.values['A3'])        
         elif(model_func=="king"):
             m=iminuit.Minuit(self.nllp_king, sig=0.02, gam=2, limit_sig = (1e-10,10.),limit_gam = (1e-10,10.))
             #m=iminuit.Minuit(self.nllp_king, sig=0.07, gam=1.5, limit_sig = (1e-10,10.),limit_gam = (1e-10,10.))

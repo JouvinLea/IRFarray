@@ -191,20 +191,22 @@ if __name__ == '__main__':
         pdf.savefig()
 
 
-    def plot_sigma(E , s1, s2, s3, pdf):
+    def plot_sigma(E , s1,err_s1, s2,err_s2, s3,err_s3, pdf):
         fig = plt.figure()
-        plt.semilogx(E, s1, "o", label= "s1")
-        plt.semilogx(E, s2, "o", label= "s2")
-        plt.semilogx(E, s3, "o", label= "s3")
+        plt.errorbar(E, s1,yerr=err_s1, marker="o", label= "s1")
+        plt.errorbar(E, s2,yerr=err_s2, marker="o", label= "s2")
+        plt.errorbar(E, s3,yerr=err_s3, marker="o", label= "s3")
+        plt.xscale("log")
         plt.ylabel("sigma (deg)")
         plt.xlabel("E (TeV)")
         plt.legend()
         plt.title("sigma evolution with MC energy")
         pdf.savefig()
 
-    def plot_sigma3(E , s3, pdf):
+    def plot_sigma3(E , s3,err_s3, pdf):
         fig = plt.figure()
-        plt.semilogx(E, s3, "o")
+        plt.errorbar(E, s3,yerr=err_s3, marker="o", label= "s3")
+        plt.xscale("log")
         plt.ylabel("sigma3 (deg)")
         plt.xlabel("E (TeV)")
         plt.legend()
@@ -223,11 +225,14 @@ if __name__ == '__main__':
     enMC = [0.02, 0.03, 0.05, 0.08, 0.125, 0.2, 0.3, 0.5, 0.8, 1.25, 2, 3, 5, 8, 12.5, 20, 30, 50, 80, 125]
     #enMC = [0.125]
     #zenMC = [0, 18, 26, 32, 37, 41, 46, 50, 53, 57, 60, 63, 67, 70]
-    zenMC = [0, 26, 37, 46, 53, 60, 67]
+    #zenMC = [0, 26, 37, 46, 53, 60, 67]
+    zenMC = [46]
     #effMC = [50, 60, 70, 80, 90, 100]
-    effMC = [50, 60, 80, 100]
+    #effMC = [50, 60, 80, 100]
+    effMC = [70]
     #offMC = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
-    offMC = [0.5, 1.5, 2.5]
+    #offMC = [0.5, 1.5, 2.5]
+    offMC = [0.5, 1.5]
     #zenMC = [67]
     #effMC = [100]
     #offMC = [1.5]
@@ -265,6 +270,9 @@ if __name__ == '__main__':
                     s1_list=[]
                     s2_list=[]
                     s3_list=[]
+                    err_s1_list=[]
+                    err_s2_list=[]
+                    err_s3_list=[]
                     with PdfPages(directory+'/zen_'+str(zen)+'_eff_'+str(eff)+'_off_'+str(off)+'.pdf') as pdf:
                         for (ien, E) in enumerate(enMC):
                             #Calculate the runnnumber for the MC zenithal angle, offset and energy
@@ -305,7 +313,7 @@ if __name__ == '__main__':
                             #theta2bintest, bin_edgestest,a = stats.binned_statistic(theta2,theta2,'mean',theta2hist)
                             #histtest, bin_edgestest,b = stats.binned_statistic(theta2,theta2,'count',theta2hist)
                             PSF=PSFfit.PSFfit(theta2f)
-                            s1,s2,s3,A2,A3=PSF.minimization("triplegauss",s1_init, s2_init, s3_init, A2_init, A3_init)
+                            s1,err_s1,s2,err_s2,s3,err_s3,A2,err_A2,A3,err_A3=PSF.minimization("triplegauss",s1_init, s2_init, s3_init, A2_init, A3_init,use_error=True)
                             #The initial parameters for the fit are the one fit on the previous MC energy
                             s1_init=s1
                             s2_init=s2
@@ -344,10 +352,13 @@ if __name__ == '__main__':
                             s1_list.append(s1)
                             s2_list.append(s2)
                             s3_list.append(s3)
+                            err_s1_list.append(err_s1)
+                            err_s2_list.append(err_s2)
+                            err_s3_list.append(err_s3)
                         if(len(Eok_list)!=0):    
                             plot_khi2(Eok_list , khi2_list, pdf)
                             plot_R68(Eok_list , R68fit_list,R68data_list, pdf)
-                            plot_sigma3(Eok_list , s3_list, pdf)
-                            plot_sigma(Eok_list , s1_list, s2_list, s3_list, pdf)
+                            plot_sigma3(Eok_list , s3_list,err_s3_list, pdf)
+                            plot_sigma(Eok_list , s1_list, err_s1_list, s2_list, err_s2_list, s3_list,err_s3_list, pdf)
 
     
