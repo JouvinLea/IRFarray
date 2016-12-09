@@ -355,7 +355,7 @@ if __name__ == '__main__':
         tbhdu_resol.header.set("EXTNAME", "EDISP_2D", "name of this binary table extension ")
         tbhdu_resol.header.set("TDIM7", "(" + str(binEMC) + "," + str(binEreco) + "," + str(binoffMC) + ")")
         # tbhdu_resol.header["EXTNAME"]='EFFECTIVE RESOL'
-        tbhdu_area.writeto(outdir + '/edisp_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
+        tbhdu_resol.writeto(outdir + '/edisp_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
         #tbhdu_resol.writeto(outdir + '/edisp_2d_0' + str(int(nrun)) + '.fits', clobber=True)
         if Path(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits').exists():
             os.remove(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits')
@@ -377,7 +377,7 @@ if __name__ == '__main__':
         tbhdu_psf = fits.BinTableHDU.from_columns(
             [c1_psf, c2_psf, c3_psf, c4_psf, c5_psf, c6_psf, c7_psf, c8_psf, c9_psf, c10_psf])
         tbhdu_psf.header.set("EXTNAME", "PSF_2D", "name of this binary table extension")
-        tbhdu_area.writeto(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)), clobber=True)
+        tbhdu_psf.writeto(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)), clobber=True)
         #tbhdu_psf.writeto(outdir + '/psf_3gauss_0' + str(int(nrun)) + '.fits', clobber=True)
         if Path(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits').exists():
             os.remove(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits')
