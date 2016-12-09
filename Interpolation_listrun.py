@@ -18,6 +18,7 @@ Commande a lancer pour pouvoir donner des arguments au scripts
 
 
 # ./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo' "Prod15_4_stereo"
+#./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo_thsq64' "Prod15_4_stereo"
 
 class Observation:
     """Helper functions to compute file and folder names.
@@ -163,7 +164,7 @@ if __name__ == '__main__':
             mode = "north"
         ZenRun = 90 - AltRun
         EffRun = hdurun[1].header["MUONEFF"] * 100
-        name_config = coupure[0:3] + "_" + mode + "_" + coupure[10:]
+        name_config = coupure[0:3] + "_" + mode + "_" + coupure[4:]
         print(nrun)
         print(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
         IRF = np.load(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
