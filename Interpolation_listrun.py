@@ -163,8 +163,7 @@ if __name__ == '__main__':
             mode = "north"
         ZenRun = 90 - AltRun
         EffRun = hdurun[1].header["MUONEFF"] * 100
-        #name_config = coupure[0:3] + "_" + mode + "_" + coupure[10:]
-        name_config="ash_north_stereo"
+        name_config = coupure[0:3] + "_" + mode + "_" + coupure[10:]
         print(nrun)
         print(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
         IRF = np.load(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
@@ -376,7 +375,7 @@ if __name__ == '__main__':
         c10_psf = Column(name='SCALE', format=str(bineffarea) + 'E', unit='', array=np.expand_dims(1 / norm, 0))
         tbhdu_psf = fits.BinTableHDU.from_columns(
             [c1_psf, c2_psf, c3_psf, c4_psf, c5_psf, c6_psf, c7_psf, c8_psf, c9_psf, c10_psf])
-        tbhdu_psf.header.set("EXTNAME", "PSF_2D", "name of this binary table extension ")
+        tbhdu_psf.header.set("EXTNAME", "PSF_2D", "name of this binary table extension")
         tbhdu_area.writeto(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)), clobber=True)
         #tbhdu_psf.writeto(outdir + '/psf_3gauss_0' + str(int(nrun)) + '.fits', clobber=True)
         if Path(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits').exists():
