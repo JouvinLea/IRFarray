@@ -17,7 +17,7 @@ Commande a lancer pour pouvoir donner des arguments au scripts
 """
 
 
-# ./script_Interpolation_listrun.py 'Crab_All.list' 'ash_stereo' "Prod15_4_stereo"
+# ./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo' "Prod15_4_stereo"
 
 class Observation:
     """Helper functions to compute file and folder names.
@@ -135,7 +135,6 @@ if __name__ == '__main__':
     directory = os.path.expandvars('$CALDB')
     PathListRun = directory + "/" + prod + "/" + coupure
 
-    IPython.embed()
     # Sur Lyon
     # PathListRun = directory+"/data/hess/hap-16-03_fits/"+prod+"/"+config
 
@@ -154,14 +153,20 @@ if __name__ == '__main__':
             print "fits corrupted for file " + namerun
             continue
         hdurun = fits.open(namerun)
-        AltRun = hdurun[1].header["ALT_PNT"]
-        if ((AltRun > 90) & (AltRun < 270)):
+        az=hdurun[1].data["AZ"]
+        az[np.where(az>180)]=az[np.where(az>180)]-360
+        AZRun=az.mean()
+        AltRun = hdurun[1].data["ALT"].mean()
+        if ((AZRun > 90) & (AZRun < 270)):
             mode = "south"
         else:
             mode = "north"
         ZenRun = 90 - AltRun
         EffRun = hdurun[1].header["MUONEFF"] * 100
-        name_config = coupure[0:3] + "_" + mode + "_" + coupure[4:10]
+        #name_config = coupure[0:3] + "_" + mode + "_" + coupure[10:]
+        name_config="ash_north_stereo"
+        print(nrun)
+        print(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
         IRF = np.load(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
         IRFArea = IRF["TableArea"]
         IRFSigma = IRF["TableSigma"]
@@ -325,7 +330,8 @@ if __name__ == '__main__':
         tbhdu_area.header.set("LO_THRES", -1, "TeV")
         tbhdu_area.header.set("HI_THRES", 150, "TeV")
         # tbhdu_area.header["EXTNAME"]='EFFECTIVE AREA'
-        tbhdu_area.writeto(outdir + '/aeff_2d_0' + str(int(nrun)) + '.fits', clobber=True)
+        #tbhdu_area.writeto(outdir + '/aeff_2d_0' + str(int(nrun)) + '.fits', clobber=True)
+        tbhdu_area.writeto(outdir + '/aeff_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
         if Path(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits').exists():
             os.remove(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits')
         if Path(outdir + '/hess_aeff_2d_0' + str(int(nrun)) + '.fits').exists():
@@ -349,7 +355,8 @@ if __name__ == '__main__':
         tbhdu_resol.header.set("EXTNAME", "EDISP_2D", "name of this binary table extension ")
         tbhdu_resol.header.set("TDIM7", "(" + str(binEMC) + "," + str(binEreco) + "," + str(binoffMC) + ")")
         # tbhdu_resol.header["EXTNAME"]='EFFECTIVE RESOL'
-        tbhdu_resol.writeto(outdir + '/edisp_2d_0' + str(int(nrun)) + '.fits', clobber=True)
+        tbhdu_area.writeto(outdir + '/edisp_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
+        #tbhdu_resol.writeto(outdir + '/edisp_2d_0' + str(int(nrun)) + '.fits', clobber=True)
         if Path(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits').exists():
             os.remove(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits')
         if Path(outdir + '/hess_edisp_2d_0' + str(int(nrun)) + '.fits').exists():
@@ -370,7 +377,8 @@ if __name__ == '__main__':
         tbhdu_psf = fits.BinTableHDU.from_columns(
             [c1_psf, c2_psf, c3_psf, c4_psf, c5_psf, c6_psf, c7_psf, c8_psf, c9_psf, c10_psf])
         tbhdu_psf.header.set("EXTNAME", "PSF_2D", "name of this binary table extension ")
-        tbhdu_psf.writeto(outdir + '/psf_3gauss_0' + str(int(nrun)) + '.fits', clobber=True)
+        tbhdu_area.writeto(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)), clobber=True)
+        #tbhdu_psf.writeto(outdir + '/psf_3gauss_0' + str(int(nrun)) + '.fits', clobber=True)
         if Path(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits').exists():
             os.remove(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits')
         if Path(outdir + '/hess_psf_3gauss_0' + str(int(nrun)) + '.fits').exists():
