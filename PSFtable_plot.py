@@ -16,10 +16,9 @@ import argparse
 For one specific config, fit the PSF for each MC simulation by a tripplegauss
 Plot for certain simulations the result of the fit as well as the khi2, R68 and sigmas
 Example of commande line to run to plot these parameters  with the directory of the MC simulation output and the config name as argument
-./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/PSF/' 'elm_south_stereo'
 
-./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'elm_south_stereo_Prod15_5' 180
-./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'elm_north_stereo_Prod15_5' 0
+./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'ash_south_stereo' 180
+./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'ash_north_stereo' 0
 """
 
 if __name__ == '__main__':
@@ -180,6 +179,7 @@ if __name__ == '__main__':
         line2,=ax1.semilogx(E, R68data, "o", label=" data ")
         #xmod = np.linspace(np.min(x),np.max(x),10000)
         ax1.get_xaxis().set_visible(False)
+        ax1.set_ylabel("R68")
         plt.legend([line1,line2], ["fit","data"])
         ax2 = fig.add_subplot(gs[3,:],sharex=ax1)
         ax2.set_xscale("log", nonposx='clip')
@@ -223,16 +223,16 @@ if __name__ == '__main__':
     MC energy, zenithal angle, offset and efficiency
     """
     enMC = [0.02, 0.03, 0.05, 0.08, 0.125, 0.2, 0.3, 0.5, 0.8, 1.25, 2, 3, 5, 8, 12.5, 20, 30, 50, 80, 125]
-    #enMC = [0.125]
+    #enMC = [2]
     #zenMC = [0, 18, 26, 32, 37, 41, 46, 50, 53, 57, 60, 63, 67, 70]
-    #zenMC = [0, 26, 37, 46, 53, 60, 67]
-    zenMC = [46]
+    zenMC = [0, 26, 37, 46, 53, 63, 67]
+    #zenMC = [67]
     #effMC = [50, 60, 70, 80, 90, 100]
-    #effMC = [50, 60, 80, 100]
-    effMC = [70]
+    effMC = [50, 60, 80, 100]
+    #effMC = [80]
     #offMC = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
-    #offMC = [0.5, 1.5, 2.5]
-    offMC = [0.5, 1.5]
+    offMC = [0.5, 1.5, 2.5]
+    #offMC = [0.5]
     #zenMC = [67]
     #effMC = [100]
     #offMC = [1.5]
@@ -340,7 +340,8 @@ if __name__ == '__main__':
                             #hist_err2 = (1+np.sqrt(histtest+0.75))/float(np.sum(histtest))/bsizetest
                             #Erreur prenant en compte poisson du coup j ai des erreurs asymetrics inf et sup
                             #histerr_test=poisson_conf_interval(hist)/float(np.sum(hist))/bsize
-                            Int_fitgauss = lambda x1,x2 : Integral_triplegauss(x1,x2,s1,s2,s3,A2,A3)                    
+                            Int_fitgauss = lambda x1,x2 : Integral_triplegauss(x1,x2,s1,s2,s3,A2,A3)
+                            #import IPython; IPython.embed()
                             plot_fit_delchi_int(theta2bin,hist_norm,hist_err,Int_fitgauss(bin_edges[:-1],bin_edges[1:])/(bsize), E, zen, off, eff, pdf, s1, s2, s3)
                             KHI2=khi2_int(theta2bin,hist_norm,hist_err,Int_fitgauss (bin_edges[:-1],bin_edges[1:])/(bsize))
                             Eok_list.append(E)    
@@ -360,5 +361,6 @@ if __name__ == '__main__':
                             plot_R68(Eok_list , R68fit_list,R68data_list, pdf)
                             plot_sigma3(Eok_list , s3_list,err_s3_list, pdf)
                             plot_sigma(Eok_list , s1_list, err_s1_list, s2_list, err_s2_list, s3_list,err_s3_list, pdf)
+    import IPython; IPython.embed()
 
     
