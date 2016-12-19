@@ -11,7 +11,8 @@ import os
 For one specific config, store the IRF on 4D numpy table for each value of the Zenithal angle, Offset, Efficiency and Energy used for the MCs simulation
 Example of commande line to run to create this 4D table where you give the config name as argument
 ./histo_array.py 'elm_south_stereo_Prod15_5'
-./histo_array.py 'elm_north_stereo_Prod15_5'
+./histo_array.py 'elm_north_stereo_Prod15_5_thsq64'
+./histo_array.py 'ash_south_stereo'
 """
 
 if __name__ == '__main__':
@@ -77,6 +78,9 @@ if __name__ == '__main__':
                 histoarea = TFileArea.Get(name_hist_area)
                 histobiais = TFileResol.Get(name_hist_biais)
                 histosigma = TFileResol.Get(name_hist_sigma)
+                #if((off==1.5) & ((zen==60)|(zen==63))):
+                #    continue
+                #import IPython; IPython.embed()
                 AreaArray = hist2array(histoarea)[ind_area]
                 AreaBiais = hist2array(histobiais)[ind_resol]
                 AreaSigma = hist2array(histosigma)[ind_resol]
