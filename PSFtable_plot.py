@@ -367,6 +367,6 @@ if __name__ == '__main__':
                             plot_R68(Eok_list , R68fit_list,R68data_list, pdf)
                             plot_sigma3(Eok_list , s3_list,err_s3_list, pdf)
                             plot_sigma(Eok_list , s1_list, err_s1_list, s2_list, err_s2_list, s3_list,err_s3_list, pdf)
-    import IPython; IPython.embed()
+    
 
     
