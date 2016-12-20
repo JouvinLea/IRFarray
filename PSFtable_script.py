@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 import numpy as np
 import astropy.io.fits as pf
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import math
 import matplotlib.gridspec as gridspec
@@ -19,8 +21,6 @@ Then store the PSF tripplegauss parameters in 4D numpy table for each value of t
 Example of commande line to run to create this 4D table with the directory of the MC simulation output and the config name as argument
 
 
-./PSFtable_script.py 'elm_south_stereo_Prod15_5' 180
-./PSFtable_script.py 'elm_north_stereo_Prod15_5' 0
 ./PSFtable_script.py 'ash_south_stereo' 180
 ./PSFtable_script.py 'ash_north_stereo' 0
 """

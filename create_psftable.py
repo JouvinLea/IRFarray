@@ -23,6 +23,8 @@ Commande a lancer pour pouvoir donner des arguments au scripts
 
 
 # ./create_psftable.py 'Crab_4runs.list' 'ash_stereo' "Prod15_4_stereo"
+#./create_psftable.py 'Crab_All.list' 'ash_stereo_thsq64' "Prod15_4_stereo"
+#./create_psftable.py 'Crab_All.list' 'ash_north_stereo_thsq64' "Prod15_4_stereo"
 
 class Observation:
     """Helper functions to compute file and folder names.
@@ -178,8 +180,8 @@ if __name__ == '__main__':
             mode = "north"
         ZenRun = 90 - AltRun
         EffRun = hdurun[1].header["MUONEFF"] * 100
-        #name_config = coupure[0:3] + "_" + mode + "_" + coupure[10:]
-        name_config="ash_north_stereo"
+        name_config = coupure[0:3] + "_" + mode + "_" + coupure[4:]
+        #name_config="ash_north_stereo"
         print(nrun)
         print(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
         IRF = np.load(PathTableIRF + "/" + name_config + "/IRF_" + name_config + ".npz")
@@ -227,11 +229,7 @@ if __name__ == '__main__':
         bin_rad=len(rad_mean)
         len_psf_table = bin_rad*binoffMC*binEMC
         
-        PSFS1Run = np.zeros((binoffMC, binEMC))
-        PSFS2Run = np.zeros((binoffMC, binEMC))
-        PSFS3Run = np.zeros((binoffMC, binEMC))
-        PSFA2Run = np.zeros((binoffMC, binEMC))
-        PSFA3Run = np.zeros((binoffMC, binEMC))
+        
         hist_value=Quantity(np.zeros(PSFA3.shape),"sr^-1")
         hist_value2=Quantity(np.zeros((bin_rad,binEMC,binoffMC,binzenMC,bineffMC)),"sr^-1")
         PSF_table=np.zeros((bin_rad,binoffMC, binEMC))
@@ -271,7 +269,8 @@ if __name__ == '__main__':
                                 PSF_table[irad,ioff, iEMC]=interpolate.griddata(points, hist_value2[irad,iEMC, ioff, ind_zen, ind_eff].value, (EffRun, np.cos(ZenRun * math.pi / 180)), method='nearest')
             #if((ioff==1) & (iEMC==10)):
                 #    import IPython; IPython.embed()
-        outdir = str(Path("/Users/jouvin/Desktop/these/FITS_DATA/HAP-FR/Prod15_4_stereo/test_ash_stereo_thsq64_psftable") / obs.folder())
+        #outdir = str(Path("/Users/jouvin/Desktop/these/FITS_DATA/HAP-FR/Prod15_4_stereo/test_ash_stereo_thsq64_psftable") / obs.folder())
+        outdir = str(Path(PathListRun) / obs.folder())
         # PSF FITS FILE
         c1_psf = Column(name='ENERG_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
         c2_psf = Column(name='ENERG_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
@@ -293,31 +292,3 @@ if __name__ == '__main__':
             os.remove(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)))
         
 
-        """
-        ind_zen, ind_eff = np.where(PSFs1[iEMC, ioff, :, :] != -1)
-            # If there is at least one simu for this offset and this energy for wich the fit works
-        if (len(ind_zen) != 0):
-            zensame = np.where(ind_zen != ind_zen[0])
-            effsame = np.where(ind_eff != ind_eff[0])
-            # Il doit y avoir au moins 2 valeurs differentes en efficacite et en zenith pour que l interpolateur marche
-            if ((len(zensame[0]) != 0) & (len(effsame[0]) != 0)):
-                coord_eff = effMC[ind_eff]
-                coord_zen = zenMC[ind_zen]
-                #points = (np.cos(coord_zen * math.pi / 180),coord_eff)
-                rad_mesh,s1_mesh=np.meshgrid(rad_mean.value,PSFs1[iEMC, ioff, ind_zen, ind_eff])
-                rad_mesh,s2_mesh=np.meshgrid(rad_mean.value,PSFs2[iEMC, ioff, ind_zen, ind_eff])
-                rad_mesh,s3_mesh=np.meshgrid(rad_mean.value,PSFs3[iEMC, ioff, ind_zen, ind_eff])
-                rad_mesh,A2_mesh=np.meshgrid(rad_mean.value,PSFA2[iEMC, ioff, ind_zen, ind_eff])
-                rad_mesh,A3_mesh=np.meshgrid(rad_mean.value,PSFA3[iEMC, ioff, ind_zen, ind_eff])
-                
-                points = (coord_eff, np.cos(coord_zen * math.pi / 180),rad_mesh.ravel())
-                hist_value2[iEMC, ioff, ind_zen, ind_eff, :]=triplegauss(rad_mesh,s1_mesh,s2_mesh,s3_mesh,A2_mesh,A3_mesh)
-
-                coord_eff_mesh,coord_rad_m=np.meshgrid(coord_eff,rad_mean)
-                coord_zen_mesh, coord_rad_m=np.meshgrid(coord_zen,rad_mean)
-                points = (coord_eff_mesh.ravel(), np.cos(coord_zen_mesh * math.pi / 180).ravel(),rad_mesh.ravel())
-                eff_run_tab=np.ones(len(rad_mean))*EffRun
-                PSF_table2[:,ioff, iEMC]=interpolate.griddata(points, hist_value2[iEMC, ioff, ind_zen, ind_eff,:],
-                                                            (EffRun, np.cos(ZenRun * math.pi / 180),rad_mean.value),
-                                                            method='linear')
-        """

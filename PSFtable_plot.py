@@ -3,6 +3,8 @@ import numpy as np
 import astropy.io.fits as pf
 import matplotlib.pyplot as plt
 import math
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.gridspec as gridspec
 import FrenchMcBands
 import PSFfit
@@ -11,23 +13,26 @@ from astropy.stats import poisson_conf_interval
 from scipy import stats
 from matplotlib.backends.backend_pdf import PdfPages
 import argparse
+import os
 
 """
 For one specific config, fit the PSF for each MC simulation by a tripplegauss
 Plot for certain simulations the result of the fit as well as the khi2, R68 and sigmas
 Example of commande line to run to plot these parameters  with the directory of the MC simulation output and the config name as argument
 
-./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'ash_south_stereo' 180
-./PSFtable_plot.py '/Users/jouvin/Desktop/these/WorkGAMMAPI/IRF/Brunoconfig/' 'ash_north_stereo' 0
+
+
+
+./PSFtable_plot.py 'ash_south_stereo' 180
+./PSFtable_script.py 'ash_north_stereo' 0
 """
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Store the PSFs from Mc simulation in a 4D numpy table')
-    parser.add_argument('directory', action="store", help='directory of the fits file of the MC simulation that we will use for fitting the PSF')
     parser.add_argument('config', action="store", help='Config')
     parser.add_argument('az_angle', action="store", help='azimuth Angle')
     results = parser.parse_args()
-    print "Store the PSF in a 4D table from the MC simulations in ", results.directory , " and for the config ", results.config, "matching with a zenith angle", results.az_angle
+    print "Plot the PSF from the MC simulations in ", os.path.expandvars('$HESSCONFIG') , " and for the config ", results.config, "matching with a zenith angle", results.az_angle
 
     """
     Fonction defenition
@@ -251,8 +256,9 @@ if __name__ == '__main__':
 
 
     MCband=FrenchMcBands.FrenchMcBands()
+    directory=os.path.expandvars('$HESSCONFIG')
     config=results.config
-    directory=results.directory+config
+    directory=directory+"/"+config
     for (ieff, eff) in enumerate(effMC):
             for (ioff, off) in enumerate(offMC):
                 for (izen, zen) in enumerate(zenMC):

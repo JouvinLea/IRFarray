@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 import numpy as np
+from astropy.coordinates import Angle
+from astropy.units import Quantity
 from astropy.io import fits
 from astropy.table import Table
 from scipy import interpolate
@@ -7,18 +9,43 @@ import math
 from astropy.io.fits import Column
 import sys
 import os
-from glob import glob
-from pathlib import Path
+from pathlib2 import Path
 import os
 import argparse
+import ast
 
 """
-Commande a lancer pour pouvoir donner des arguments au scripts
+To lauch the script Interpolation_listrun.py, you use the following command with the parameters:
+1: run list
+2: config name
+3: Prod name
+4: True if you want to compute the effective area
+5: True if you want to compute energy dispersion
+6: True if you want to compute the PSF table
 """
 
 
-# ./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo' "Prod15_4_stereo"
-#./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo_thsq64' "Prod15_4_stereo"
+# ./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo' "Prod15_4_stereo" True True True
+# ./Interpolation_listrun.py 'Crab_All.list' 'ash_stereo_thsq64' "Prod15_4_stereo" True True True
+
+def gauss(x, sigma, mean):
+    f = 1 / (np.sqrt(2 * math.pi) * sigma) * np.exp(-(x - mean) ** 2 / (2 * sigma ** 2))
+    return f
+
+
+def triplegauss(theta2, s1, s2, s3, A2, A3):
+    s12 = s1 * s1
+    s22 = s2 * s2
+    s32 = s3 * s3
+
+    gaus1 = np.exp(-theta2 / (2 * s12))
+    gaus2 = np.exp(-theta2 / (2 * s22))
+    gaus3 = np.exp(-theta2 / (2 * s32))
+
+    y = (gaus1 + A2 * gaus2 + A3 * gaus3)
+    norm = 2 * math.pi * (s12 + np.abs(A2) * s22 + np.abs(A3) * s32)
+    return y / norm
+
 
 class Observation:
     """Helper functions to compute file and folder names.
@@ -118,23 +145,40 @@ class Observation:
         return True
 
 
-def gauss(x, sigma, mean):
-    f = 1 / (np.sqrt(2 * math.pi) * sigma) * np.exp(-(x - mean) ** 2 / (2 * sigma ** 2))
-    return f
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Make the index and obs table')
     parser.add_argument('runlist', action="store",
                         help='List of run for which we want to interpolate the IRFs')
     parser.add_argument('config', action="store", help='Prod Configuration, cut we apply')
     parser.add_argument('prod', action="store", help='Prod')
+    parser.add_argument('compute_aeff', action="store",
+                        help='True if you want to compute the effective area for each run')
+    parser.add_argument('compute_edisp', action="store",
+                        help='True if you want to compute the energy dispersion for each run')
+    parser.add_argument('compute_psf', action="store", help='True if you want to compute the PSF table for each run')
+
     arg = parser.parse_args()
     runlist = arg.runlist
     coupure = arg.config
     prod = arg.prod
     directory = os.path.expandvars('$CALDB')
+    compute_aeff = ast.literal_eval(arg.compute_aeff)
+    compute_edisp = ast.literal_eval(arg.compute_edisp)
+    compute_psf = ast.literal_eval(arg.compute_psf)
     PathListRun = directory + "/" + prod + "/" + coupure
+    print "Interpolate the IRFs for the runs in ", PathListRun, ", for the Runlist", arg.runlist
+    if compute_aeff:
+        print "Compute the Effective Area"
+    else:
+        print "The interpolation of Effective Area is not computed"
+    if compute_edisp:
+        print "Compute the Energy Dispersion"
+    else:
+        print "The interpolation of Energy Dispersion is not computed"
+    if compute_psf:
+        print "Compute the PSF table"
+    else:
+        print "The interpolation of PSF table is not computed"
 
     # Sur Lyon
     # PathListRun = directory+"/data/hess/hap-16-03_fits/"+prod+"/"+config
@@ -154,9 +198,9 @@ if __name__ == '__main__':
             print "fits corrupted for file " + namerun
             continue
         hdurun = fits.open(namerun)
-        az=hdurun[1].data["AZ"]
-        az[np.where(az>180)]=az[np.where(az>180)]-360
-        AZRun=az.mean()
+        az = hdurun[1].data["AZ"]
+        az[np.where(az > 180)] = az[np.where(az > 180)] - 360
+        AZRun = az.mean()
         AltRun = hdurun[1].data["ALT"].mean()
         if ((AZRun > 90) & (AZRun < 270)):
             mode = "south"
@@ -178,14 +222,17 @@ if __name__ == '__main__':
         offMC = IRF["offMC"]
 
         PSF = np.load(PathTablePSF + "/" + name_config + "/PSF_triplegauss_" + name_config + ".npz")
-        PSFs1 = PSF["TableSigma1"]
-        PSFs2 = PSF["TableSigma2"]
-        PSFs3 = PSF["TableSigma3"]
+        PSFs1 = Angle(PSF["TableSigma1"], "deg")
+        PSFs2 = Angle(PSF["TableSigma2"], "deg")
+        PSFs3 = Angle(PSF["TableSigma3"], "deg")
         PSFA2 = PSF["TableA2"]
         PSFA3 = PSF["TableA3"]
 
         binoffMC = len(offMC)
         binEMC = len(enMC)
+        binzenMC = len(zenMC)
+        bineffMC = len(effMC)
+
         # binEreco=50
         binEreco = 100
         bineffarea = len(offMC) * len(enMC)
@@ -218,168 +265,142 @@ if __name__ == '__main__':
         E_reco_true_low = np.exp(lnE_reco_true_low)
         E_reco_true_hi = np.exp(lnE_reco_true_up)
 
-        AreaRun = np.zeros((binoffMC, binEMC))
-        ResolRun = np.zeros((binoffMC, binEreco, binEMC))
+        # Define offset for the table PSF
+        rad = Angle(np.arange(0, 1.5, 0.005), 'deg')
+        rad_low = rad[0:-1]
+        rad_high = rad[1:]
+        rad_mean = (rad_low + rad_high) / 2.
+        bin_rad = len(rad_mean)
+        len_psf_table = bin_rad * binoffMC * binEMC
 
-        PSFS1Run = np.zeros((binoffMC, binEMC))
-        PSFS2Run = np.zeros((binoffMC, binEMC))
-        PSFS3Run = np.zeros((binoffMC, binEMC))
-        PSFA2Run = np.zeros((binoffMC, binEMC))
-        PSFA3Run = np.zeros((binoffMC, binEMC))
+        if compute_aeff:
+            AreaRun = np.zeros((binoffMC, binEMC))
+        if compute_edisp:
+            ResolRun = np.zeros((binoffMC, binEreco, binEMC))
+        if compute_psf:
+            PSF_table = np.zeros((bin_rad, binoffMC, binEMC))
+            hist_value = Quantity(np.zeros((bin_rad, binEMC, binoffMC, binzenMC, bineffMC)), "sr^-1")
+            s1_mesh = np.tile(PSFs1, (len(rad_mean.value), 1, 1, 1, 1))
+            s2_mesh = np.tile(PSFs2, (len(rad_mean.value), 1, 1, 1, 1))
+            s3_mesh = np.tile(PSFs3, (len(rad_mean.value), 1, 1, 1, 1))
+            A2_mesh = np.tile(PSFA2, (len(rad_mean.value), 1, 1, 1, 1))
+            A3_mesh = np.tile(PSFA3, (len(rad_mean.value), 1, 1, 1, 1))
+            rad_mesh = rad_mean.reshape(len(rad_mean.value), 1, 1, 1, 1) * np.ones_like(PSFs1.value)
+            hist_value = triplegauss(rad_mesh ** 2, s1_mesh, s2_mesh, s3_mesh, A2_mesh, A3_mesh).to("sr^-1")
 
         for (iEMC, EMC) in enumerate(enMC):
             for (ioff, off) in enumerate(offMC):
                 # print ioff, " ", iEMC
-                InterArea = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFArea[iEMC, ioff, :, :])
-                InterBiais = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFBiais[iEMC, ioff, :, :])
-                InterSigma = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFSigma[iEMC, ioff, :, :])
-                AreaRun[ioff, iEMC] = InterArea(EffRun, np.cos(ZenRun * math.pi / 180))
-                BiaisRun = InterBiais(EffRun, np.cos(ZenRun * math.pi / 180))
-                SigmaRun = InterSigma(EffRun, np.cos(ZenRun * math.pi / 180))
-                ResolRun[ioff, :, iEMC] = gauss(lnEreco_true, SigmaRun, BiaisRun) / Ereco_true
-                # etre sur que c est bien normalise
-                norm = np.sum(ResolRun[ioff, :, iEMC] * (E_reco_true_hi - E_reco_true_low))
+                if compute_aeff:
+                    InterArea = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFArea[iEMC, ioff, :, :])
+                    AreaRun[ioff, iEMC] = InterArea(EffRun, np.cos(ZenRun * math.pi / 180))
+                if compute_edisp:
+                    InterBiais = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFBiais[iEMC, ioff, :, :])
+                    InterSigma = interpolate.interp2d(effMC, np.cos(zenMC * math.pi / 180), IRFSigma[iEMC, ioff, :, :])
+                    BiaisRun = InterBiais(EffRun, np.cos(ZenRun * math.pi / 180))
+                    SigmaRun = InterSigma(EffRun, np.cos(ZenRun * math.pi / 180))
+                    ResolRun[ioff, :, iEMC] = gauss(lnEreco_true, SigmaRun, BiaisRun) / Ereco_true
+                    # etre sur que c est bien normalise
+                    norm = np.sum(ResolRun[ioff, :, iEMC] * (E_reco_true_hi - E_reco_true_low))
 
-                if (np.isnan(norm)):
-                    ResolRun[ioff, :, iEMC] = 0
-                else:
-                    ResolRun[ioff, :, iEMC] = ResolRun[ioff, :, iEMC] / norm
-
-                ind_zen, ind_eff = np.where(PSFs1[iEMC, ioff, :, :] != -1)
-                # If there is at least one simu for this offset and this energy for wich the fit works
-                if (len(ind_zen) != 0):
-                    zensame = np.where(ind_zen != ind_zen[0])
-                    effsame = np.where(ind_eff != ind_eff[0])
-                    # Il doit y avoir au moins 2 valeurs differentes en efficacite et en zenith pour que l interpolateur marche
-                    if ((len(zensame[0]) != 0) & (len(effsame[0]) != 0)):
-                        coord_eff = effMC[ind_eff]
-                        coord_zen = zenMC[ind_zen]
-                        points = (coord_eff, np.cos(coord_zen * math.pi / 180))
-
-                        PSFS1Run[ioff, iEMC] = interpolate.griddata(points, PSFs1[iEMC, ioff, ind_zen, ind_eff],
-                                                                    (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                    method='linear')
-                        if np.isnan(PSFS1Run[ioff, iEMC]):
-                            PSFS1Run[ioff, iEMC] = interpolate.griddata(points, PSFs1[iEMC, ioff, ind_zen, ind_eff],
-                                                                        (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                        method='nearest')
-
-                        PSFS2Run[ioff, iEMC] = interpolate.griddata(points, PSFs2[iEMC, ioff, ind_zen, ind_eff],
-                                                                    (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                    method='linear')
-                        if np.isnan(PSFS2Run[ioff, iEMC]):
-                            PSFS2Run[ioff, iEMC] = interpolate.griddata(points, PSFs2[iEMC, ioff, ind_zen, ind_eff],
-                                                                        (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                        method='nearest')
-
-                        PSFS3Run[ioff, iEMC] = interpolate.griddata(points, PSFs3[iEMC, ioff, ind_zen, ind_eff],
-                                                                    (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                    method='linear')
-                        if np.isnan(PSFS3Run[ioff, iEMC]):
-                            PSFS3Run[ioff, iEMC] = interpolate.griddata(points, PSFs3[iEMC, ioff, ind_zen, ind_eff],
-                                                                        (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                        method='nearest')
-
-                        PSFA2Run[ioff, iEMC] = interpolate.griddata(points, PSFA2[iEMC, ioff, ind_zen, ind_eff],
-                                                                    (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                    method='linear')
-                        if np.isnan(PSFA2Run[ioff, iEMC]):
-                            PSFA2Run[ioff, iEMC] = interpolate.griddata(points, PSFA2[iEMC, ioff, ind_zen, ind_eff],
-                                                                        (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                        method='nearest')
-
-                        PSFA3Run[ioff, iEMC] = interpolate.griddata(points, PSFA3[iEMC, ioff, ind_zen, ind_eff],
-                                                                    (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                    method='linear')
-                        if np.isnan(PSFA3Run[ioff, iEMC]):
-                            PSFA3Run[ioff, iEMC] = interpolate.griddata(points, PSFA3[iEMC, ioff, ind_zen, ind_eff],
-                                                                        (EffRun, np.cos(ZenRun * math.pi / 180)),
-                                                                        method='nearest')
-
-                            #                else:
-                            #                    PSFS1Run[ioff, iEMC] = -1
-                            #                    PSFS2Run[ioff, iEMC] = -1
-                            #                    PSFS3Run[ioff, iEMC] = -1
-                            #                    PSFA2Run[ioff, iEMC] = -1
-                            #                    PSFA3Run[ioff, iEMC] = -1
-                            #            else:
-                            #                PSFS1Run[ioff, iEMC] = -1
-                            #                PSFS2Run[ioff, iEMC] = -1
-                            #                PSFS3Run[ioff, iEMC] = -1
-                            #                PSFA2Run[ioff, iEMC] = -1
-                            #                PSFA3Run[ioff, iEMC] = -1
+                    if (np.isnan(norm)):
+                        ResolRun[ioff, :, iEMC] = 0
+                    else:
+                        ResolRun[ioff, :, iEMC] = ResolRun[ioff, :, iEMC] / norm
+                if compute_psf:
+                    ind_zen, ind_eff = np.where(PSFs1[iEMC, ioff, :, :].value != -1)
+                    # If there is at least one simu for this offset and this energy for wich the fit works
+                    if (len(ind_zen) != 0):
+                        zensame = np.where(ind_zen != ind_zen[0])
+                        effsame = np.where(ind_eff != ind_eff[0])
+                        # Il doit y avoir au moins 2 valeurs differentes en efficacite et en zenith pour que l interpolateur marche
+                        if ((len(zensame[0]) != 0) & (len(effsame[0]) != 0)):
+                            coord_eff = effMC[ind_eff]
+                            coord_zen = zenMC[ind_zen]
+                            points = (coord_eff, np.cos(coord_zen * math.pi / 180))
+                            for (irad, rad) in enumerate(rad_mean):
+                                PSF_table[irad, ioff, iEMC] = interpolate.griddata(points, hist_value[
+                                    irad, iEMC, ioff, ind_zen, ind_eff].value, (EffRun, np.cos(ZenRun * math.pi / 180)),
+                                                                                   method='linear')
+                                if np.isnan(PSF_table[irad, ioff, iEMC]):
+                                    PSF_table[irad, ioff, iEMC] = interpolate.griddata(points, hist_value[
+                                        irad, iEMC, ioff, ind_zen, ind_eff].value, (EffRun,
+                                                                                    np.cos(ZenRun * math.pi / 180)),
+                                                                                       method='nearest')
 
         outdir = str(Path(PathListRun) / obs.folder())
         # Ecriture des fichiers fits pour aeff, edisp et psf pour chaque observation
-        # AEFF FITS FILE
-        c1_area = Column(name='ENERG_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
-        c2_area = Column(name='ENERG_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
-        c3_area = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
-        c4_area = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
-        c5_area = Column(name='EFFAREA', format=str(bineffarea) + 'E', unit='m2', array=np.expand_dims(AreaRun, 0))
-        c6_area = Column(name='EFFAREA_RECO', format=str(bineffarea) + 'E', unit='m2', array=np.expand_dims(AreaRun, 0))
-        tbhdu_area = fits.BinTableHDU.from_columns([c1_area, c2_area, c3_area, c4_area, c5_area, c6_area])
-        for i in range(1, 7):
-            tbhdu_area.header.comments['TTYPE' + str(i)] = 'label for field ' + str(i)
-            tbhdu_area.header.comments['TFORM' + str(i)] = 'data format of field: 4-byte REAL'
-            tbhdu_area.header.comments['TUNIT' + str(i)] = 'physical unit of field '
+        if compute_aeff:
+            # AEFF FITS FILE
+            c1_area = Column(name='ENERG_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
+            c2_area = Column(name='ENERG_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
+            c3_area = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
+            c4_area = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
+            c5_area = Column(name='EFFAREA', format=str(bineffarea) + 'E', unit='m2', array=np.expand_dims(AreaRun, 0))
+            c6_area = Column(name='EFFAREA_RECO', format=str(bineffarea) + 'E', unit='m2',
+                             array=np.expand_dims(AreaRun, 0))
+            tbhdu_area = fits.BinTableHDU.from_columns([c1_area, c2_area, c3_area, c4_area, c5_area, c6_area])
+            for i in range(1, 7):
+                tbhdu_area.header.comments['TTYPE' + str(i)] = 'label for field ' + str(i)
+                tbhdu_area.header.comments['TFORM' + str(i)] = 'data format of field: 4-byte REAL'
+                tbhdu_area.header.comments['TUNIT' + str(i)] = 'physical unit of field '
 
-        tbhdu_area.header.set("EXTNAME", "EFFECTIVE AREA", "name of this binary table extension ")
-        tbhdu_area.header.set("TDIM5", "(" + str(binEMC) + "," + str(binoffMC) + ")")
-        tbhdu_area.header.set("TDIM6", "(" + str(binEMC) + "," + str(binoffMC) + ")")
-        tbhdu_area.header.set("LO_THRES", -1, "TeV")
-        tbhdu_area.header.set("HI_THRES", 150, "TeV")
-        # tbhdu_area.header["EXTNAME"]='EFFECTIVE AREA'
-        #tbhdu_area.writeto(outdir + '/aeff_2d_0' + str(int(nrun)) + '.fits', clobber=True)
-        tbhdu_area.writeto(outdir + '/aeff_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
-        if Path(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits')
-        if Path(outdir + '/hess_aeff_2d_0' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_aeff_2d_0' + str(int(nrun)) + '.fits')
+            tbhdu_area.header.set("EXTNAME", "EFFECTIVE AREA", "name of this binary table extension ")
+            tbhdu_area.header.set("TDIM5", "(" + str(binEMC) + "," + str(binoffMC) + ")")
+            tbhdu_area.header.set("TDIM6", "(" + str(binEMC) + "," + str(binoffMC) + ")")
+            tbhdu_area.header.set("LO_THRES", -1, "TeV")
+            tbhdu_area.header.set("HI_THRES", 150, "TeV")
+            # tbhdu_area.header["EXTNAME"]='EFFECTIVE AREA'
+            # tbhdu_area.writeto(outdir + '/aeff_2d_0' + str(int(nrun)) + '.fits', clobber=True)
+            tbhdu_area.writeto(outdir + '/aeff_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
+            if Path(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits').exists():
+                os.remove(outdir + '/hess_aeff_2d_' + str(int(nrun)) + '.fits')
+            if Path(outdir + '/hess_aeff_2d_0' + str(int(nrun)) + '.fits').exists():
+                os.remove(outdir + '/hess_aeff_2d_0' + str(int(nrun)) + '.fits')
 
-        # EDISP FITS FILE
-        c1_resol = Column(name='ETRUE_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
-        c2_resol = Column(name='ETRUE_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
-        c3_resol = Column(name='MIGRA_LO', format=str(binEreco) + 'E', unit='', array=np.atleast_2d(E_reco_true_low))
-        c4_resol = Column(name='MIGRA_HI', format=str(binEreco) + 'E', unit='', array=np.atleast_2d(E_reco_true_hi))
-        c5_resol = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
-        c6_resol = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
-        c7_resol = Column(name='MATRIX ', format=str(bineffresol) + 'E', unit='TeV', array=np.expand_dims(ResolRun, 0))
-        tbhdu_resol = fits.BinTableHDU.from_columns(
-            [c1_resol, c2_resol, c3_resol, c4_resol, c5_resol, c6_resol, c7_resol])
-        for i in range(1, 8):
-            tbhdu_resol.header.comments['TTYPE' + str(i)] = 'label for field ' + str(i)
-            tbhdu_resol.header.comments['TFORM' + str(i)] = 'data format of field: 4-byte REAL'
-            #        tbhdu_resol.header.comments['TUNIT'+str(i)]='physical unit of field '
+        if compute_edisp:
+            # EDISP FITS FILE
+            c1_resol = Column(name='ETRUE_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
+            c2_resol = Column(name='ETRUE_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
+            c3_resol = Column(name='MIGRA_LO', format=str(binEreco) + 'E', unit='',
+                              array=np.atleast_2d(E_reco_true_low))
+            c4_resol = Column(name='MIGRA_HI', format=str(binEreco) + 'E', unit='', array=np.atleast_2d(E_reco_true_hi))
+            c5_resol = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
+            c6_resol = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
+            c7_resol = Column(name='MATRIX ', format=str(bineffresol) + 'E', unit='TeV',
+                              array=np.expand_dims(ResolRun, 0))
+            tbhdu_resol = fits.BinTableHDU.from_columns(
+                [c1_resol, c2_resol, c3_resol, c4_resol, c5_resol, c6_resol, c7_resol])
+            for i in range(1, 8):
+                tbhdu_resol.header.comments['TTYPE' + str(i)] = 'label for field ' + str(i)
+                tbhdu_resol.header.comments['TFORM' + str(i)] = 'data format of field: 4-byte REAL'
+                #        tbhdu_resol.header.comments['TUNIT'+str(i)]='physical unit of field '
 
-        tbhdu_resol.header.set("EXTNAME", "EDISP_2D", "name of this binary table extension ")
-        tbhdu_resol.header.set("TDIM7", "(" + str(binEMC) + "," + str(binEreco) + "," + str(binoffMC) + ")")
-        # tbhdu_resol.header["EXTNAME"]='EFFECTIVE RESOL'
-        tbhdu_resol.writeto(outdir + '/edisp_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
-        #tbhdu_resol.writeto(outdir + '/edisp_2d_0' + str(int(nrun)) + '.fits', clobber=True)
-        if Path(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits')
-        if Path(outdir + '/hess_edisp_2d_0' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_edisp_2d_0' + str(int(nrun)) + '.fits')
-        # PSF FITS FILE
-        c1_psf = Column(name='ENERG_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
-        c2_psf = Column(name='ENERG_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
-        c3_psf = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
-        c4_psf = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
+            tbhdu_resol.header.set("EXTNAME", "EDISP_2D", "name of this binary table extension ")
+            tbhdu_resol.header.set("TDIM7", "(" + str(binEMC) + "," + str(binEreco) + "," + str(binoffMC) + ")")
+            # tbhdu_resol.header["EXTNAME"]='EFFECTIVE RESOL'
+            tbhdu_resol.writeto(outdir + '/edisp_2d_{:06d}.fits'.format(int(nrun)), clobber=True)
+            # tbhdu_resol.writeto(outdir + '/edisp_2d_0' + str(int(nrun)) + '.fits', clobber=True)
+            if Path(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits').exists():
+                os.remove(outdir + '/hess_edisp_2d_' + str(int(nrun)) + '.fits')
+            if Path(outdir + '/hess_edisp_2d_0' + str(int(nrun)) + '.fits').exists():
+                os.remove(outdir + '/hess_edisp_2d_0' + str(int(nrun)) + '.fits')
 
-        norm = 2 * np.pi * (PSFS1Run ** 2 + PSFA2Run * PSFS2Run ** 2 + PSFA3Run * PSFS3Run ** 2)
-        c5_psf = Column(name='SIGMA_1', format=str(bineffarea) + 'E', unit='deg', array=np.expand_dims(PSFS1Run, 0))
-        c6_psf = Column(name='AMPL_2', format=str(bineffarea) + 'E', unit='', array=np.expand_dims(PSFA2Run, 0))
-        c7_psf = Column(name='SIGMA_2', format=str(bineffarea) + 'E', unit='deg', array=np.expand_dims(PSFS2Run, 0))
-        c8_psf = Column(name='AMPL_3', format=str(bineffarea) + 'E', unit='', array=np.expand_dims(PSFA3Run, 0))
-        c9_psf = Column(name='SIGMA_3', format=str(bineffarea) + 'E', unit='deg', array=np.expand_dims(PSFS3Run, 0))
-        c10_psf = Column(name='SCALE', format=str(bineffarea) + 'E', unit='', array=np.expand_dims(1 / norm, 0))
-        tbhdu_psf = fits.BinTableHDU.from_columns(
-            [c1_psf, c2_psf, c3_psf, c4_psf, c5_psf, c6_psf, c7_psf, c8_psf, c9_psf, c10_psf])
-        tbhdu_psf.header.set("EXTNAME", "PSF_2D", "name of this binary table extension")
-        tbhdu_psf.writeto(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)), clobber=True)
-        #tbhdu_psf.writeto(outdir + '/psf_3gauss_0' + str(int(nrun)) + '.fits', clobber=True)
-        if Path(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_psf_3gauss_' + str(int(nrun)) + '.fits')
-        if Path(outdir + '/hess_psf_3gauss_0' + str(int(nrun)) + '.fits').exists():
-            os.remove(outdir + '/hess_psf_3gauss_0' + str(int(nrun)) + '.fits')
+        if compute_psf:
+            # PSF FITS FILE
+            c1_psf = Column(name='ENERG_LO', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_low))
+            c2_psf = Column(name='ENERG_HI', format=str(binEMC) + 'E', unit='TeV', array=np.atleast_2d(E_true_up))
+            c3_psf = Column(name='THETA_LO', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_low))
+            c4_psf = Column(name='THETA_HI', format=str(binoffMC) + 'E', unit='deg', array=np.atleast_2d(off_hi))
+            c5_psf = Column(name='RAD_LO', format=str(bin_rad) + 'E', unit='deg', array=np.atleast_2d(rad_low))
+            c6_psf = Column(name='RAD_HI', format=str(bin_rad) + 'E', unit='deg', array=np.atleast_2d(rad_high))
+            c7_psf = Column(name='RPSF', format=str(len_psf_table) + 'E', unit='sr^-1',
+                            array=np.expand_dims((PSF_table), 0))
+            tbhdu_psf = fits.BinTableHDU.from_columns(
+                [c1_psf, c2_psf, c3_psf, c4_psf, c5_psf, c6_psf, c7_psf])
+            tbhdu_psf.header.set("EXTNAME", "PSF_2D_TABLE", "name of this binary table extension")
+            # tbhdu_psf.header.set("TDIM7", "(" + str(binEMC) + "," + str(binoffMC) + "," + str(bin_rad) + ")")
+            tbhdu_psf.header.set("TDIM7", "(" + str(binEMC) + "," + str(binoffMC) + "," + str(bin_rad) + ")")
+            tbhdu_psf.writeto(outdir + '/psf_table_{:06d}.fits'.format(int(nrun)), clobber=True)
+            if Path(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun))).exists():
+                os.remove(outdir + '/psf_3gauss_{:06d}.fits'.format(int(nrun)))
