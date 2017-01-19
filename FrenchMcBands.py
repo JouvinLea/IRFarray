@@ -2,7 +2,7 @@ import numpy as np
 
 class FrenchMcBands(object):
 
-    def __init__(self,i=4):
+    def __init__(self,i=4,energy_type="fixed_energy"):
         #First digit of the run: particule type
         self.part_type=["gamma"]
         self.part_type_digit="1"
@@ -16,10 +16,16 @@ class FrenchMcBands(object):
         self.offMC = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
         self.offMC_digit=["0","1","2","3","4","5"]
         #fith digit of the run: energy type (spectrum or fixed energy)
-        self.energy_type="1"
-        #sixth digit of the run: MC energy
-        self.enMC = [0.02, 0.03, 0.05, 0.08, 0.125, 0.2, 0.3, 0.5, 0.8, 1.25, 2, 3, 5, 8, 12.5, 20, 30, 50, 80, 125]
-        self.enMC_digit=["01", "02" , "03" , "04", "05" ,"06" , "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
+        if energy_type=="fixed_energy":
+            self.energy_type="1"
+            #sixth digit of the run: MC energy
+            self.enMC = [0.02, 0.03, 0.05, 0.08, 0.125, 0.2, 0.3, 0.5, 0.8, 1.25, 2, 3, 5, 8, 12.5, 20, 30, 50, 80, 125]
+            self.enMC_digit=["01", "02" , "03" , "04", "05" ,"06" , "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
+        elif energy_type=="spectrum":
+            self.energy_type="0"
+            #sixth digit of the run: MC gamma spectrum
+            self.enMC = [2, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8]
+            self.enMC_digit=["01", "02" , "03" , "04", "05" ,"06" , "07", "08", "09", "10"]
 
     def find_azimuth_digit(self, az):
         """
